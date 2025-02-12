@@ -16,19 +16,25 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def cut_media(input_path, output_path, start_time, end_time=None):
-    if input_path.endswith('.mp4'):
-        with VideoFileClip(input_path) as video:
-            if end_time is None:
-                end_time = video.duration
-            # Use the correct slice method
-            cut_video = video.subclip(t_start=start_time, t_end=end_time)
-            cut_video.write_videofile(output_path, codec='libx264')
-    else:
-        with AudioFileClip(input_path) as audio:
-            if end_time is None:
-                end_time = audio.duration
-            cut_audio = audio.subclip(t_start=start_time, t_end=end_time)
-            cut_audio.write_audiofile(output_path)
+    try:
+        if input_path.lower().endswith('.mp4'):
+            with VideoFileClip(input_path) as video:
+                if end_time is None:
+                    end_time = video.duration
+                if start_time >= end_time:
+                    raise ValueError("Start time must be less than end time.")
+                cut_video = video.subclip(start_time, end_time)
+                cut_video.write_videofile(output_path)
+        else:
+            with AudioFileClip(input_path) as audio:
+                if end_time is None:
+                    end_time = audio.duration
+                if start_time >= end_time:
+                    raise ValueError("Start time must be less than end time.")
+                cut_audio = audio.subclip(start_time, end_time)
+                cut_audio.write_audiofile(output_path)
+    except Exception as e:
+        raise e
 
 def download_from_url(url):
     ydl_opts = {
@@ -36,9 +42,12 @@ def download_from_url(url):
         'outtmpl': os.path.join(app.config['UPLOAD_FOLDER'], '%(title)s.%(ext)s'),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-    return filename
+        try:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            return filename
+        except Exception as e:
+            raise e
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -47,7 +56,7 @@ def index():
         start_time = start_minutes * 60
 
         use_end = 'use_end' in request.form
-        if not use_end:
+        if use_end:
             end_minutes = float(request.form.get('end_minutes', 0))
             end_time = end_minutes * 60
         else:
@@ -92,9 +101,11 @@ def index():
 
         except Exception as e:
             flash(f'Error processing file: {str(e)}')
+            if os.path.exists(input_path):
+                os.remove(input_path)
             return redirect(url_for('index'))
 
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5062)
+    app.run(debug=True)
