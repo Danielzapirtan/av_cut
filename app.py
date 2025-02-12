@@ -18,6 +18,16 @@ ALLOWED_EXTENSIONS = {'mp3', 'mp4'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def parse_time(time_str):
+    """Convert minutes:seconds format to seconds"""
+    try:
+        if ':' in time_str:
+            minutes, seconds = map(float, time_str.split(':'))
+            return minutes * 60 + seconds
+        return float(time_str) * 60  # Backward compatibility for minutes-only input
+    except ValueError:
+        raise ValueError(f"Invalid time format: {time_str}. Please use minutes:seconds (e.g., 1:30)")
+
 def get_duration(filepath):
     if filepath.endswith('.mp4'):
         clip = VideoFileClip(filepath)
@@ -55,15 +65,15 @@ def download_from_url(url):
 def index():
     if request.method == 'POST':
         try:
-            start_minutes = float(request.form.get('start_minutes', 0))
-            start_time = start_minutes * 60
+            start_time_str = request.form.get('start_time', '0:00').strip()
+            start_time = parse_time(start_time_str)
 
             use_end = 'use_end' in request.form
             end_time = None
             if not use_end:
-                end_minutes = request.form.get('end_minutes', '').strip()
-                if end_minutes:
-                    end_time = float(end_minutes) * 60
+                end_time_str = request.form.get('end_time', '').strip()
+                if end_time_str:
+                    end_time = parse_time(end_time_str)
 
             # Handle URL input
             if url := request.form.get('url'):
