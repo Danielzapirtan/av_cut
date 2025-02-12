@@ -6,7 +6,7 @@ from moviepy import VideoFileClip, AudioFileClip
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
