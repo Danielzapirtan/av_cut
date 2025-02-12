@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, send_file, flash, redirect, u
 from werkzeug.utils import secure_filename
 import os
 import yt_dlp
-from moviepy.editor import VideoFileClip, AudioFileClip
+from moviepy import VideoFileClip, AudioFileClip
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
@@ -96,4 +96,4 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5062)
