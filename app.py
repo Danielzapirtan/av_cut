@@ -85,7 +85,7 @@ iface = gr.Interface(
         gr.File(label="Upload File"),
         gr.Textbox(label="YouTube URL"),
         gr.Textbox(label="Start Time (e.g., 1:30)", value="0:00"),
-        gr.Textbox(label="End Time (e.g., 2:00)", optional=True),
+        gr.Textbox(label="End Time (e.g., 2:00)"),
         gr.Checkbox(label="Use end of file", value=False)
     ],
     outputs=gr.File(label="Download Cut Media"),
