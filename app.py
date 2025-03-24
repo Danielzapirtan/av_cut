@@ -1,17 +1,11 @@
-from flask import Flask, render_template, request, send_file, flash, redirect, url_for, after_this_request
-from werkzeug.utils import secure_filename
+import gradio as gr
 import os
 import yt_dlp
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 
-app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # Required for flash messages
-app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
-
-# Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+UPLOAD_FOLDER = '/tmp/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {'mp3', 'mp4'}
 
@@ -43,90 +37,61 @@ def cut_media(input_path, output_path, start_time, end_time=None):
         with VideoFileClip(input_path) as video:
             if end_time is None:
                 end_time = video.duration
-            cut_video = video.subclipped(start_time, end_time)
+            cut_video = video.subclip(start_time, end_time)
             cut_video.write_videofile(output_path, codec="libx264", audio_codec="aac")
     else:
         with AudioFileClip(input_path) as audio:
             if end_time is None:
                 end_time = audio.duration
-            cut_audio = audio.subclipped(start_time, end_time)
+            cut_audio = audio.subclip(start_time, end_time)
             cut_audio.write_audiofile(output_path)
 
 def download_from_url(url):
     ydl_opts = {
         'format': 'best',
-        'outtmpl': os.path.join(app.config['UPLOAD_FOLDER'], '%(title)s.%(ext)s'),
+        'outtmpl': os.path.join(UPLOAD_FOLDER, '%(title)s.%(ext)s'),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         return ydl.prepare_filename(info)
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        try:
-            start_time_str = request.form.get('start_time', '0:00').strip()
-            start_time = parse_time(start_time_str)
+def process_media(file, url, start_time_str, end_time_str=None, use_end=False):
+    try:
+        start_time = parse_time(start_time_str)
+        end_time = parse_time(end_time_str) if end_time_str and not use_end else None
 
-            use_end = 'use_end' in request.form
-            end_time = None
-            if not use_end:
-                end_time_str = request.form.get('end_time', '').strip()
-                if end_time_str:
-                    end_time = parse_time(end_time_str)
+        if url:
+            input_path = download_from_url(url)
+        elif file:
+            if not allowed_file(file.name):
+                raise ValueError("Invalid file type. Only MP3 and MP4 files are allowed.")
+            input_path = file.name
+        else:
+            raise ValueError("No file or URL provided")
 
-            # Handle URL input
-            if url := request.form.get('url'):
-                try:
-                    input_path = download_from_url(url)
-                except Exception as e:
-                    flash(f'Error downloading from URL: {str(e)}')
-                    return redirect(url_for('index'))
+        output_filename = f'cut_{os.path.basename(input_path)}'
+        output_path = os.path.join(UPLOAD_FOLDER, output_filename)
 
-            # Handle file upload
-            elif 'file' in request.files:
-                file = request.files['file']
-                if file.filename == '':
-                    flash('No file selected')
-                    return redirect(url_for('index'))
+        cut_media(input_path, output_path, start_time, end_time)
 
-                if not allowed_file(file.filename):
-                    flash('Invalid file type. Only MP3 and MP4 files are allowed.')
-                    return redirect(url_for('index'))
+        return output_path
 
-                input_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
-                file.save(input_path)
-            else:
-                flash('No file or URL provided')
-                return redirect(url_for('index'))
+    except Exception as e:
+        return f"Error processing file: {str(e)}"
 
-            # Create output filename
-            output_filename = f'cut_{os.path.basename(input_path)}'
-            output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
+iface = gr.Interface(
+    fn=process_media,
+    inputs=[
+        gr.File(label="Upload File"),
+        gr.Textbox(label="YouTube URL"),
+        gr.Textbox(label="Start Time (e.g., 1:30)", value="0:00"),
+        gr.Textbox(label="End Time (e.g., 2:00)", optional=True),
+        gr.Checkbox(label="Use end of file", value=False)
+    ],
+    outputs=gr.File(label="Download Cut Media"),
+    title="Media Cutter",
+    description="Upload a file or provide a YouTube URL to cut a segment from the media."
+)
 
-            # Cut the media file
-            cut_media(input_path, output_path, start_time, end_time)
-
-            # Cleanup input file
-            if os.path.exists(input_path):
-                os.remove(input_path)
-
-            # Schedule cleanup after sending file
-            @after_this_request
-            def remove_file(response):
-                try:
-                    os.remove(output_path)
-                except Exception as e:
-                    app.logger.error(f"Error deleting file: {e}")
-                return response
-
-            return send_file(output_path, as_attachment=True)
-
-        except Exception as e:
-            flash(f'Error processing file: {str(e)}')
-            return redirect(url_for('index'))
-
-    return render_template('index.html')
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5062)
+if __name__ == "__main__":
+    iface.launch(share=True)
