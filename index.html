@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Cut</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, sans-serif;
+  background: #111827;
+  color: #e5e7eb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.5rem;
+  gap: 1.2rem;
+}
+h1 { font-size: 1.7rem; color: #a78bfa; letter-spacing: -0.5px; }
+
+#upload-area {
+  border: 2px dashed #6d28d9;
+  border-radius: 14px;
+  padding: 2.5rem 5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  color: #9ca3af;
+}
+#upload-area.drag-over, #upload-area:hover { background: #1f2937; border-color: #a78bfa; }
+#upload-area strong { color: #c4b5fd; }
+#upload-area input { display: none; }
+
+#player-section { display: none; flex-direction: column; gap: 1rem; width: 100%; max-width: 960px; }
+
+#waveform-wrap {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: crosshair;
+  background: #1f2937;
+  height: 130px;
+  user-select: none;
+}
+#waveform { display: block; width: 100%; height: 100%; }
+
+/* Playhead label */
+#waveform-wrap::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 4px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+#transport {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #fff;
+  background: #6d28d9;
+}
+button:hover { background: #7c3aed; }
+button:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+#play-btn { min-width: 100px; }
+#mark-btn { background: #be123c; }
+#mark-btn:hover { background: #e11d48; }
+#dl-btn { background: #065f46; margin-left: auto; }
+#dl-btn:hover { background: #047857; }
+#clear-btn { background: #374151; }
+#clear-btn:hover { background: #4b5563; }
+
+#time { font-variant-numeric: tabular-nums; font-size: 0.95rem; color: #a78bfa; white-space: nowrap; }
+
+#hints {
+  font-size: 0.82rem;
+  color: #6b7280;
+  text-align: center;
+}
+#hints kbd {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 0 5px;
+  color: #d1d5db;
+}
+
+#status { font-size: 0.88rem; color: #86efac; min-height: 1.1em; text-align: center; }
+
+#chunks-list { width: 100%; max-width: 960px; display: flex; flex-direction: column; gap: 0.4rem; }
+.chunk-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #1f2937;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.88rem;
+}
+.chunk-label { color: #a78bfa; font-weight: 600; min-width: 68px; }
+.chunk-times { flex: 1; color: #d1d5db; }
+.chunk-dur { color: #6b7280; font-size: 0.82rem; min-width: 60px; text-align: right; }
+.rm-btn {
+  background: #7f1d1d;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+}
+.rm-btn:hover { background: #991b1b; }
+</style>
+</head>
+<body>
+
+<h1>🎙 Audio Cut</h1>
+
+<div id="upload-area" tabindex="0" role="button" aria-label="Upload audio file">
+  <label>
+    Drop an audio file here or <strong>click to browse</strong>
+    <div style="margin-top:0.4rem;font-size:0.8rem">MP3 · WAV · OGG · FLAC · M4A · …</div>
+    <input type="file" id="file-input" accept="audio/*">
+  </label>
+</div>
+
+<div id="player-section">
+  <div id="waveform-wrap" data-tip="Click anywhere on the waveform to place a marker">
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <div id="transport">
+    <button id="play-btn">▶ Play</button>
+    <span id="time">0:00.00 / 0:00.00</span>
+    <button id="mark-btn">📍 Mark here &nbsp;<kbd>M</kbd></button>
+    <button id="clear-btn">Clear all</button>
+    <button id="dl-btn" disabled>⬇ Download chunks</button>
+  </div>
+
+  <div id="hints">
+    <kbd>Space</kbd> Play / Pause &nbsp;·&nbsp;
+    <kbd>M</kbd> or <strong>click waveform</strong> = add marker at current time &nbsp;·&nbsp;
+    <kbd>←</kbd><kbd>→</kbd> seek 5 s
+  </div>
+</div>
+
+<div id="status"></div>
+<div id="chunks-list"></div>
+
+<script>
+/* ── state ── */
+let audioBuf = null, audioCtx = null, srcNode = null;
+let isPlaying = false, startedAt = 0, pausedAt = 0, duration = 0;
+let markers = [];       // sorted seconds
+let rafId = null;
+let fileName = 'audio';
+
+/* ── elements ── */
+const uploadArea  = document.getElementById('upload-area');
+const fileInput   = document.getElementById('file-input');
+const playerSec   = document.getElementById('player-section');
+const wrapEl      = document.getElementById('waveform-wrap');
+const canvas      = document.getElementById('waveform');
+const ctx2d       = canvas.getContext('2d');
+const playBtn     = document.getElementById('play-btn');
+const markBtn     = document.getElementById('mark-btn');
+const clearBtn    = document.getElementById('clear-btn');
+const dlBtn       = document.getElementById('dl-btn');
+const timeEl      = document.getElementById('time');
+const statusEl    = document.getElementById('status');
+const chunksList  = document.getElementById('chunks-list');
+
+/* ── upload / drag-drop ── */
+uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', ()  => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('audio/')) loadFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+/* ── load & decode ── */
+async function loadFile(file) {
+  fileName = file.name.replace(/\.[^.]+$/, '');
+  setStatus('Decoding…');
+  stopPlayback(false);
+  markers = [];
+  pausedAt = 0;
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const ab = await file.arrayBuffer();
+  audioBuf = await audioCtx.decodeAudioData(ab);
+  duration = audioBuf.duration;
+
+  uploadArea.style.display = 'none';
+  playerSec.style.display = 'flex';
+
+  await new Promise(r => requestAnimationFrame(r)); // let layout settle
+  resizeCanvas();
+  drawAll();
+  updateChunksList();
+  updateDlBtn();
+  setStatus('Ready — click the waveform or press M to place markers.');
+}
+
+/* ── canvas sizing ── */
+function resizeCanvas() {
+  canvas.width  = wrapEl.clientWidth;
+  canvas.height = wrapEl.clientHeight;
+}
+window.addEventListener('resize', () => { if (audioBuf) { resizeCanvas(); drawAll(); } });
+
+/* ── drawing ── */
+function drawAll() {
+  const W = canvas.width, H = canvas.height;
+  ctx2d.clearRect(0, 0, W, H);
+  drawWaveformData(W, H);
+  drawMarkers(W, H);
+  drawPlayhead(W, H);
+}
+
+function drawWaveformData(W, H) {
+  const ch  = audioBuf.getChannelData(0);
+  const step = Math.max(1, Math.floor(ch.length / W));
+  const mid  = H / 2;
+
+  ctx2d.beginPath();
+  ctx2d.strokeStyle = '#5b21b6';
+  ctx2d.lineWidth = 1;
+  for (let x = 0; x < W; x++) {
+    let lo = 0, hi = 0;
+    const base = x * step;
+    for (let j = 0; j < step; j++) {
+      const s = ch[base + j] || 0;
+      if (s < lo) lo = s;
+      if (s > hi) hi = s;
+    }
+    ctx2d.moveTo(x + 0.5, mid + lo * mid * 0.88);
+    ctx2d.lineTo(x + 0.5, mid + hi * mid * 0.88);
+  }
+  ctx2d.stroke();
+
+  // subtle center line
+  ctx2d.beginPath();
+  ctx2d.strokeStyle = '#374151';
+  ctx2d.lineWidth = 1;
+  ctx2d.moveTo(0, mid);
+  ctx2d.lineTo(W, mid);
+  ctx2d.stroke();
+}
+
+function drawMarkers(W, H) {
+  markers.forEach(t => {
+    const x = Math.round((t / duration) * W) + 0.5;
+    ctx2d.beginPath();
+    ctx2d.strokeStyle = '#f87171';
+    ctx2d.lineWidth = 2;
+    ctx2d.moveTo(x, 0);
+    ctx2d.lineTo(x, H);
+    ctx2d.stroke();
+    // handle triangle
+    ctx2d.fillStyle = '#f87171';
+    ctx2d.beginPath();
+    ctx2d.moveTo(x - 7, 0);
+    ctx2d.lineTo(x + 7, 0);
+    ctx2d.lineTo(x, 13);
+    ctx2d.closePath();
+    ctx2d.fill();
+  });
+}
+
+function drawPlayhead(W, H) {
+  const x = Math.round((getCurrentTime() / duration) * W) + 0.5;
+  ctx2d.beginPath();
+  ctx2d.strokeStyle = '#fbbf24';
+  ctx2d.lineWidth = 2;
+  ctx2d.moveTo(x, 0);
+  ctx2d.lineTo(x, H);
+  ctx2d.stroke();
+}
+
+/* ── playback ── */
+function getCurrentTime() {
+  if (!audioBuf) return 0;
+  if (isPlaying) return Math.min(audioCtx.currentTime - startedAt + pausedAt, duration);
+  return Math.min(pausedAt, duration);
+}
+
+function play() {
+  if (!audioBuf) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  srcNode = audioCtx.createBufferSource();
+  srcNode.buffer = audioBuf;
+  srcNode.connect(audioCtx.destination);
+  const offset = Math.min(pausedAt, duration);
+  srcNode.start(0, offset);
+  startedAt  = audioCtx.currentTime - offset;
+  isPlaying  = true;
+  playBtn.textContent = '⏸ Pause';
+  srcNode.onended = () => { if (isPlaying) { pausedAt = 0; isPlaying = false; playBtn.textContent = '▶ Play'; drawAll(); } };
+  rafId = requestAnimationFrame(animate);
+}
+
+function pause() {
+  if (!isPlaying) return;
+  pausedAt = getCurrentTime();
+  srcNode.stop();
+  isPlaying = false;
+  playBtn.textContent = '▶ Play';
+  cancelAnimationFrame(rafId);
+  drawAll();
+  updateTime();
+}
+
+function stopPlayback(reset = true) {
+  if (isPlaying && srcNode) { try { srcNode.stop(); } catch (_) {} }
+  isPlaying = false;
+  if (reset) pausedAt = 0;
+  playBtn.textContent = '▶ Play';
+  cancelAnimationFrame(rafId);
+}
+
+function animate() {
+  drawAll();
+  updateTime();
+  if (getCurrentTime() < duration && isPlaying) rafId = requestAnimationFrame(animate);
+}
+
+function updateTime() {
+  timeEl.textContent = `${fmt(getCurrentTime())} / ${fmt(duration)}`;
+}
+
+playBtn.addEventListener('click', () => isPlaying ? pause() : play());
+
+/* ── markers ── */
+function addMarker(t) {
+  t = Math.max(0.001, Math.min(duration - 0.001, t));
+  if (markers.some(m => Math.abs(m - t) < 0.08)) return; // too close
+  markers.push(t);
+  markers.sort((a, b) => a - b);
+  drawAll();
+  updateChunksList();
+  updateDlBtn();
+  setStatus(`Marker at ${fmt(t)}`);
+}
+
+markBtn.addEventListener('click', () => addMarker(getCurrentTime()));
+
+clearBtn.addEventListener('click', () => {
+  markers = [];
+  drawAll();
+  updateChunksList();
+  updateDlBtn();
+  setStatus('Markers cleared.');
+});
+
+/* click on waveform → marker at that time */
+canvas.addEventListener('click', e => {
+  if (!audioBuf) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = ((e.clientX - rect.left) / rect.width) * duration;
+  addMarker(t);
+});
+
+/* ── keyboard ── */
+document.addEventListener('keydown', e => {
+  if (!audioBuf || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); isPlaying ? pause() : play(); }
+  if (e.code === 'KeyM')  { e.preventDefault(); addMarker(getCurrentTime()); }
+  if (e.code === 'ArrowRight') { e.preventDefault(); seek(5); }
+  if (e.code === 'ArrowLeft')  { e.preventDefault(); seek(-5); }
+});
+
+function seek(delta) {
+  const t = Math.max(0, Math.min(duration, getCurrentTime() + delta));
+  if (isPlaying) { pause(); pausedAt = t; play(); }
+  else { pausedAt = t; drawAll(); updateTime(); }
+}
+
+/* ── chunks list ── */
+function updateChunksList() {
+  chunksList.innerHTML = '';
+  const bounds = [0, ...markers, duration];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const s = bounds[i], e = bounds[i + 1];
+    const row = document.createElement('div');
+    row.className = 'chunk-row';
+    row.innerHTML = `
+      <span class="chunk-label">Chunk ${i + 1}</span>
+      <span class="chunk-times">${fmt(s)} → ${fmt(e)}</span>
+      <span class="chunk-dur">${fmt(e - s)}</span>
+      ${i > 0 && i <= markers.length
+        ? `<button class="rm-btn" data-midx="${i - 1}">✕ marker</button>` : ''}
+    `;
+    chunksList.appendChild(row);
+  }
+  chunksList.querySelectorAll('.rm-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      markers.splice(+btn.dataset.midx, 1);
+      drawAll();
+      updateChunksList();
+      updateDlBtn();
+    });
+  });
+}
+
+function updateDlBtn() {
+  dlBtn.disabled = !audioBuf;
+  const n = markers.length + 1;
+  dlBtn.textContent = `⬇ Download ${n} chunk${n !== 1 ? 's' : ''}`;
+}
+
+/* ── WAV encoding ── */
+function encodeWAV(buf, t0, t1) {
+  const sr   = buf.sampleRate;
+  const nCh  = buf.numberOfChannels;
+  const s0   = Math.floor(t0 * sr);
+  const s1   = Math.min(Math.ceil(t1 * sr), buf.length);
+  const len  = s1 - s0;
+  const ab   = new ArrayBuffer(44 + len * nCh * 2);
+  const view = new DataView(ab);
+  const ws   = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+
+  ws(0, 'RIFF');
+  view.setUint32(4,  36 + len * nCh * 2, true);
+  ws(8, 'WAVE');
+  ws(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);          // PCM
+  view.setUint16(22, nCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * nCh * 2, true);
+  view.setUint16(32, nCh * 2, true);
+  view.setUint16(34, 16, true);
+  ws(36, 'data');
+  view.setUint32(40, len * nCh * 2, true);
+
+  let off = 44;
+  for (let i = 0; i < len; i++) {
+    for (let ch = 0; ch < nCh; ch++) {
+      const v = Math.max(-1, Math.min(1, buf.getChannelData(ch)[s0 + i]));
+      view.setInt16(off, v < 0 ? v * 0x8000 : v * 0x7FFF, true);
+      off += 2;
+    }
+  }
+  return ab;
+}
+
+/* ── download ── */
+dlBtn.addEventListener('click', async () => {
+  if (!audioBuf) return;
+  dlBtn.disabled = true;
+  const bounds = [0, ...markers, duration];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    setStatus(`Encoding chunk ${i + 1} of ${bounds.length - 1}…`);
+    await new Promise(r => setTimeout(r, 0)); // yield
+    const wav  = encodeWAV(audioBuf, bounds[i], bounds[i + 1]);
+    const blob = new Blob([wav], { type: 'audio/wav' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `${fileName}_chunk${String(i + 1).padStart(2, '0')}.wav`
+    });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    await new Promise(r => setTimeout(r, 250));
+  }
+  setStatus(`✅ ${bounds.length - 1} chunk(s) downloaded.`);
+  dlBtn.disabled = false;
+  updateDlBtn();
+});
+
+/* ── helpers ── */
+function fmt(s) {
+  const m   = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(2).padStart(5, '0');
+  return `${m}:${sec}`;
+}
+function setStatus(msg) { statusEl.textContent = msg; }
+</script>
+</body>
+</html>
