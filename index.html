@@ -507,7 +507,7 @@
         updateCutButtonState();
         // If boundaries method active, maybe adjust existing boundaries? No, keep as is.
       } catch (err) {
-        statusMessage.textContent = '❌ Failed to decode audio.';
+	      statusMessage.textContent = ```❌ Failed to decode audio. ${err}`;
         audioBuffer = null;
         cutBtn.disabled = true;
         console.error(err);
