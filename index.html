@@ -501,6 +501,9 @@
       
       const arrayBuffer = await file.arrayBuffer();
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioCtx) {
+        alert('Try a different browser!');
+      }
       try {
         audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
         statusMessage.textContent = `✅ Loaded · ${formatTime(audioBuffer.duration)}`;
