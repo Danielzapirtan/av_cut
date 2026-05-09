@@ -500,7 +500,8 @@
       fileDisplay.textContent = `${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
       
       const arrayBuffer = await file.arrayBuffer();
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      //const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioCtx = new AudioContext();
       if (!audioCtx) {
         alert('Try a different browser!');
       }
