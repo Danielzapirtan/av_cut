@@ -170,6 +170,15 @@ class MediaCutter {
         this.selection.style.width = (endPercent - startPercent) + '%';
     }
     
+    updateReverseTimeline() {
+        if (this.duration === 0) return;
+        
+	const startPercent = this.startHandle.style.left;
+	const endPercent = this.endHandle.style.left;
+	this.startTime = startPercent * this.duration / 100;
+	this.endTime = endPercent * this.duration / 100;
+    }
+    
     startDrag(event, handle) {
         event.preventDefault();
         this.isDragging = true;
@@ -196,7 +205,7 @@ class MediaCutter {
             }
         }
         
-        this.updateTimeline();
+        this.updateReverseTimeline();
     }
     
     stopDrag() {
