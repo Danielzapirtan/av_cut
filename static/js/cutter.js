@@ -166,7 +166,7 @@ class MediaCutter {
         
         this.startHandle.style.left = startPercent;
         this.endHandle.style.left = endPercent;
-        this.selection.style.left = startPercent';
+        this.selection.style.left = startPercent;
         this.selection.style.width = (endPercent - startPercent);
     }
     
