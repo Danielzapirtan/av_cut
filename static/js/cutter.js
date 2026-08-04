@@ -205,7 +205,7 @@ class MediaCutter {
             }
         }
         
-        //this.updateReverseTimeline();
+        this.updateTimeline();
     }
     
     stopDrag() {
