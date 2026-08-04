@@ -77,7 +77,7 @@ class MediaProcessor:
                 is_video = False
             
             # Cut the clip
-            cut_clip = clip.subclip(start_time, end_time)
+            cut_clip = clip.subclipped(start_time, end_time)
             
             # Export based on type
             if is_video and output_format in ['mp4', 'avi', 'mov', 'webm']:
