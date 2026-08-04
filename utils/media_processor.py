@@ -1,6 +1,6 @@
 import os
 import json
-from moviepy.editor import VideoFileClip, AudioFileClip
+from moviepy import VideoFileClip, AudioFileClip
 from datetime import timedelta
 
 class MediaProcessor:
