@@ -1,7 +1,0 @@
-Flask
-Flask-WTF
-moviepy
-yt-dlp
-python-magic
-Werkzeug
-Pillow
