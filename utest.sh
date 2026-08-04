@@ -7,8 +7,8 @@ if test -z $VIRTUAL_ENV; then
 	source venv/bin/activate
 	export VIRTUAL_ENV
 fi
-apt update
-apt -y install ffmpeg yt-dlp
+sudo apt update
+sudo apt -y install ffmpeg yt-dlp
 pip install -r requirements.txt
 python$VER app.py
 
