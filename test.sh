@@ -8,8 +8,7 @@ if test -z $VIRTUAL_ENV; then
 	source venv/bin/activate
 	export VIRTUAL_ENV
 fi
-brew install ffmpeg
+brew install ffmpeg yt-dlp
 pip install -r requirements.txt
-pip install -r requirements-mlx.txt
 python$VER app.py
 
