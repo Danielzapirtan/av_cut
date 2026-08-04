@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Media Cutter - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Upload Media or Enter YouTube URL</h5>
+                
+                <!-- Upload Section -->
+                <div class="mb-3">
+                    <label for="fileUpload" class="form-label">Upload File</label>
+                    <input type="file" class="form-control" id="fileUpload" accept="video/*,audio/*">
+                    <div class="progress mt-2" style="display: none;">
+                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <!-- YouTube Section -->
+                <div class="mb-3">
+                    <label for="youtubeUrl" class="form-label">YouTube URL</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=...">
+                        <button class="btn btn-danger" id="youtubeBtn">Download</button>
+                    </div>
+                </div>
+                
+                <div id="mediaInfo" style="display: none;">
+                    <hr>
+                    <h6>Media Information</h6>
+                    <div id="mediaDetails"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Player and Controls -->
+        <div class="card mb-4" id="editorSection" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">Media Editor</h5>
+                
+                <!-- Video/Audio Player -->
+                <div class="mb-3">
+                    <video id="mediaPlayer" controls style="width: 100%; max-height: 400px;">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                
+                <!-- Timeline with Handles -->
+                <div class="mb-3">
+                    <label class="form-label">Timeline</label>
+                    <div class="timeline-container" style="position: relative; height: 60px; background: #f0f0f0; border-radius: 5px;">
+                        <div id="timeline" style="position: absolute; top: 0; left: 0; right: 0; height: 100%;">
+                            <div id="selection" style="position: absolute; height: 100%; background: rgba(0,123,255,0.3);"></div>
+                            <div id="startHandle" class="timeline-handle" style="position: absolute; left: 0; width: 10px; height: 100%; background: #007bff; cursor: ew-resize;"></div>
+                            <div id="endHandle" class="timeline-handle" style="position: absolute; right: 0; width: 10px; height: 100%; background: #007bff; cursor: ew-resize;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Time Inputs -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="startTime" class="form-label">Start Time</label>
+                        <input type="text" class="form-control" id="startTime" placeholder="00:00:00">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="endTime" class="form-label">End Time</label>
+                        <input type="text" class="form-control" id="endTime" placeholder="00:00:00">
+                    </div>
+                </div>
+                
+                <!-- Export Options -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="outputFormat" class="form-label">Format</label>
+                        <select class="form-control" id="outputFormat">
+                            <option value="mp4">MP4 (Video)</option>
+                            <option value="mp3">MP3 (Audio)</option>
+                            <option value="avi">AVI (Video)</option>
+                            <option value="mov">MOV (Video)</option>
+                            <option value="webm">WebM (Video)</option>
+                            <option value="wav">WAV (Audio)</option>
+                            <option value="ogg">OGG (Audio)</option>
+                            <option value="m4a">M4A (Audio)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="quality" class="form-label">Quality</label>
+                        <select class="form-control" id="quality">
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-success form-control" id="cutBtn">Cut & Download</button>
+                    </div>
+                </div>
+                
+                <!-- Preview Player -->
+                <div class="mb-3" id="previewSection" style="display: none;">
+                    <h6>Preview</h6>
+                    <video id="previewPlayer" controls style="width: 100%; max-height: 300px;"></video>
+                </div>
+                
+                <!-- Export Data -->
+                <div class="mb-3">
+                    <button class="btn btn-info" id="exportJsonBtn">Export JSON</button>
+                    <button class="btn btn-info" id="exportCsvBtn">Export CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Integration Example -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                API Integration Examples
+            </div>
+            <div class="card-body">
+                <pre><code>
+// Example API calls for integration with custom apps:
+
+// Get media info
+GET /api/info/{filename}
+
+// Cut media
+POST /cut
+{
+    "filepath": "/path/to/file",
+    "start_time": 10.5,
+    "end_time": 30.2,
+    "format": "mp4",
+    "quality": "high"
+}
+
+// Export metadata
+POST /export
+{
+    "format": "json", // or "csv"
+    "media_data": {
+        "title": "My Video",
+        "start": "00:10",
+        "end": "00:30",
+        "duration": "00:20"
+    }
+}
+                </code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

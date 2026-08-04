@@ -1,0 +1,37 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-container {
+    user-select: none;
+}
+
+.timeline-handle {
+    transition: background-color 0.3s;
+}
+
+.timeline-handle:hover {
+    background-color: #0056b3 !important;
+}
+
+#mediaPlayer, #previewPlayer {
+    background: #000;
+    border-radius: 5px;
+}
+
+.progress {
+    height: 5px;
+}
+
+.btn {
+    margin-right: 5px;
+}
+
+.card-title {
+    color: #333;
+    font-weight: 600;
+}
