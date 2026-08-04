@@ -177,7 +177,7 @@ class MediaCutter {
     }
     
     drag(event) {
-        if (!this.isDragging) return;
+//        if (!this.isDragging) return;
         
         const timelineRect = this.timeline.getBoundingClientRect();
         const x = event.clientX - timelineRect.left;
