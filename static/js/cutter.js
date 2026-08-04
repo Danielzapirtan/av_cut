@@ -164,10 +164,10 @@ class MediaCutter {
         const startPercent = (this.startTime / this.duration) * 100;
         const endPercent = (this.endTime / this.duration) * 100;
         
-        this.startHandle.style.left = startPercent;
-        this.endHandle.style.left = endPercent;
-        this.selection.style.left = startPercent;
-        this.selection.style.width = (endPercent - startPercent);
+        this.startHandle.style.left = startPercent + '%';
+        this.endHandle.style.left = endPercent + '%';
+        this.selection.style.left = startPercent + '%';
+        this.selection.style.width = (endPercent - startPercent) + '%';
     }
     
     updateReverseTimeline() {
