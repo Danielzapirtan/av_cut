@@ -10,5 +10,5 @@ fi
 sudo apt update
 sudo apt -y install ffmpeg yt-dlp
 pip install -r requirements.txt
-python$VER app.py
+python$VER app.py &
 

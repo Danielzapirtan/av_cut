@@ -10,5 +10,5 @@ if test -z $VIRTUAL_ENV; then
 fi
 brew install ffmpeg yt-dlp
 pip install -r requirements.txt
-python$VER app.py
+python$VER app.py &
 
